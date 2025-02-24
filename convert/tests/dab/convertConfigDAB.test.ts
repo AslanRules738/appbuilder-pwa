@@ -13,6 +13,11 @@ const { document } = dom.window;
 const appDefinition = document.getElementsByTagName('app-definition')[0];
 const programType = appDefinition.attributes.getNamedItem('type')!.value;
 
+test('Ensure all elements have been parsed', () => {
+    let txt = readFileSync("./convert/output/unparsedElements.txt", 'utf-8');
+    expect(txt).toEqual("passed");
+});
+
 if (programType === 'SAB') {
     test('Dummy test for DAB testing for SAB file', () => {
         expect(0).toEqual(0);

@@ -42,3 +42,4 @@ src/lib/data/firebase-config.js
 src/lib/data/config.js
 src/lib/data/contents.js
 vite.config.js.timestamp*
+output/unparsedElements.txt

@@ -33,6 +33,11 @@ const { document } = dom.window;
 const appDefinition = document.getElementsByTagName('app-definition')[0];
 const programType = appDefinition.attributes.getNamedItem('type')!.value;
 
+test('Ensure all elements have been parsed', () => {
+    let txt = readFileSync("./convert/output/unparsedElements.txt", 'utf-8');
+    expect(txt).toEqual("passed");
+});
+
 test('convertConfig: parse fonts', () => {
     const result = parseFonts(document, 1);
     for (const f of result) {

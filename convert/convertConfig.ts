@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, type PathLike } from 'fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, type PathLike } from 'fs';
 import path, { basename, extname } from 'path';
 import type {
     AppConfig,
@@ -16,6 +16,31 @@ import { splitVersion } from './stringUtils';
 import { Task, type TaskOutput } from './Task';
 
 const fontFamilies: string[] = [];
+
+function getTopAndMark(doc: Document, tagName: string) {
+    let theTop = doc.getElementsByTagName(tagName)[0]
+    theTop.setAttribute("dirty", "true");
+    let children = theTop.getElementsByTagName(tagName);
+    for (let i = 0; i < children.length; i++) {
+        children[i].setAttribute("dirty-child", "true");
+    }
+    return theTop;
+}
+
+function getTopChildrenAndMark(headInstance: Element, tagName: string) {
+    headInstance?.setAttribute("dirty", "true");
+    let children = headInstance.getElementsByTagName(tagName);
+    for (let i = 0; i < children.length; i++) {
+        children[i].setAttribute("dirty-child", "true");
+    }
+    return children;
+}
+
+function getTopTagAndMark(headInstance: Element, tagName: string) {
+    let theTop = headInstance.getElementsByTagName(tagName)[0];
+    theTop?.setAttribute("dirty-child", "true");
+    return theTop;
+}
 
 function decodeFromXml(input: string): string {
     return input
@@ -48,7 +73,8 @@ export function parseAdditionalNames(namesTag: Element, verbose: number) {
 }
 export function parseStyles(stylesTag: Element, verbose: number) {
     const styles = [];
-    const styleTags = stylesTag?.getElementsByTagName('style');
+    //const styleTags = stylesTag?.getElementsByTagName('style');
+    const styleTags = getTopChildrenAndMark(stylesTag, 'style'); // THIS HAS GOT TO BE MESSY
     if (!styleTags) throw new Error('Styles tag not found in xml');
     for (const tag of styleTags) {
         //console.log(tag.outerHTML);
@@ -102,7 +128,8 @@ export function parseStylesInfo(stylesInfoTag: Element, verbose: number): StyleC
 }
 
 export function parseTrait(tag: Element, name: string): string {
-    const traitTags = tag.getElementsByTagName('trait');
+    //const traitTags = tag.getElementsByTagName('trait');
+    const traitTags = getTopChildrenAndMark(tag, "trait");
     for (const tag of traitTags) {
         if (tag.attributes.getNamedItem('name')!.value === name) {
             return tag.attributes.getNamedItem('value')!.value;
@@ -208,6 +235,18 @@ function convertConfig(dataDir: string, verbose: number) {
     });
     const { document } = dom.window;
 
+    let headOfHeads = document.querySelector(`app-definition`);
+    let childrenOfHeads = headOfHeads?.children!;
+    for (let j = 0; j < childrenOfHeads.length; j++) {
+        let curNode = childrenOfHeads[j];
+        curNode.setAttribute("dirty", "false");
+        let childrenOfChildren = curNode?.children!;
+        for (let i = 0; i < childrenOfChildren.length; i++) {
+            let curChild = childrenOfChildren[i];
+            curChild.setAttribute("dirty-child", "false");
+        }
+    }
+
     // Program info
     const appDefinition = document.getElementsByTagName('app-definition')[0];
     const programType = appDefinition.attributes.getNamedItem('type')!.value;
@@ -246,6 +285,7 @@ function convertConfig(dataDir: string, verbose: number) {
     }
 
     const mainStyles = document.querySelector('styles')!;
+    //const mainStyles = getTopAndMark(document,"styles");
     data.styles = parseStyles(mainStyles, verbose);
 
     if (isScriptureConfig(data)) {
@@ -260,7 +300,8 @@ function convertConfig(dataDir: string, verbose: number) {
     }
     if (isDictionaryConfig(data)) {
         const writingSystems: { [key: string]: DictionaryWritingSystemConfig } = {};
-        const writingSystemsTag = document.getElementsByTagName('writing-systems')[0];
+        //const writingSystemsTag = document.getElementsByTagName('writing-systems')[0];
+        const writingSystemsTag = getTopAndMark(document, 'writing-systems');
         const writingSystemTags = writingSystemsTag.getElementsByTagName('writing-system');
         for (const tag of writingSystemTags) {
             const writingSystem = parseDictionaryWritingSystem(tag, verbose);
@@ -271,7 +312,8 @@ function convertConfig(dataDir: string, verbose: number) {
         data.writingSystems = writingSystems;
         // Parsing indexes
         const indexes: { [key: string]: { displayed: boolean } } = {};
-        const indexesTag = document.getElementsByTagName('indexes')[0];
+        //const indexesTag = document.getElementsByTagName('indexes')[0];
+        const indexesTag = getTopAndMark(document, 'indexes');
         const indexTags = indexesTag.getElementsByTagName('index');
         for (const tag of indexTags) {
             const lang: string = tag.attributes.getNamedItem('lang')!.value;
@@ -345,6 +387,58 @@ function convertConfig(dataDir: string, verbose: number) {
                 plans
             };
         }
+
+        const excludeList = ["app-name", "package", "apk-filename", "version", "multiple-apks", "android-sdk", "install-location", "ipa-filename", "ipa-version", "ipa-asset-filename", "ipa-app-type", "ipa-container-audio", "pwa-manifest", "database-filename", "about", "deep-linking", "expiry", "security"];
+
+        let cleanAttribute = document.querySelectorAll(`[dirty=false]`);
+
+        if (cleanAttribute.length > 0) console.log("---- UNPARSED ELEMENTS HAVE BEEN DETECTED: ----");
+
+        let unparsedElements = "";
+
+        for (let att of cleanAttribute) {
+            if (!excludeList.includes(att.nodeName)) {
+
+                if (att.hasAttribute("type")) {
+                    console.log(att.nodeName, att.getAttribute("type"));
+                    unparsedElements += att.nodeName;
+                    unparsedElements += " ";
+                }
+                else {
+                    console.log(att.nodeName);
+                    unparsedElements += att.nodeName;
+                    unparsedElements += " ";
+                }
+            }
+        }
+
+        let cleanChildren = document.querySelectorAll(`[dirty-child=false]`);
+        console.log("### Unparsed children ###");
+        for (let child of cleanChildren) {
+            if (child.parentElement?.getAttribute("dirty") == "true") {
+                if (child.parentElement!.nodeName == "books") {
+                    console.log(child.parentElement!.nodeName, ": ", child.parentElement!.getAttribute("id"), ": ", child.nodeName);
+                }
+                else {
+                    console.log(child.parentElement!.nodeName, ": ", child.nodeName);
+                }
+            }
+        }
+
+        /*let dirtyChildren = document.querySelectorAll(`[dirty-child=true]`);
+        for (let child of dirtyChildren) {
+            if (child.parentElement?.getAttribute("dirty") == "true") {
+                console.log("Normal dirty:", child.nodeName, "of", child.parentElement!.nodeName);
+            }
+            else console.log("Head misparse error:", child.nodeName, "of", child.parentElement!.nodeName);
+        }*/
+
+        if (unparsedElements == "") {
+            writeFileSync('./convert/output/unparsedElements.txt', "passed");
+        } else {
+            writeFileSync('./convert/output/unparsedElements.txt', unparsedElements);
+        }
+
     }
 
     /*
@@ -361,11 +455,14 @@ function convertConfig(dataDir: string, verbose: number) {
 }
 
 export function parseFeatures(document: Document, verbose: number) {
-    const mainFeatureTags = document
-        .querySelector('features[type=main]')
-        ?.getElementsByTagName('e');
-    if (!mainFeatureTags) throw new Error('Features tag not found in xml');
+    //const mainFeatureTags = document
+    //    .querySelector('features[type=main]')
+    //    ?.getElementsByTagName('e');
+
+    const headFeaturesMain = document.querySelector('features[type=main]');
+    if (!headFeaturesMain) throw new Error('Features tag not found in xml');
     const mainFeatures: { [key: string]: any } = {};
+    const mainFeatureTags = getTopChildrenAndMark(headFeaturesMain!, 'e');
 
     for (const tag of mainFeatureTags) {
         try {
@@ -385,9 +482,9 @@ export function parseFeatures(document: Document, verbose: number) {
 }
 
 export function parseFonts(document: Document, verbose: number) {
-    const fontTags = document.getElementsByTagName('fonts')[0].getElementsByTagName('font');
+    //const fontTags = document.getElementsByTagName('fonts')[0].getElementsByTagName('font');
     const fonts = [];
-
+    const fontTags = getTopChildrenAndMark(getTopAndMark(document, 'fonts'), 'font');
     for (const tag of fontTags) {
         const family = tag.attributes.getNamedItem('family')!.value;
         const name = tag.getElementsByTagName('display-name')[0]?.innerHTML;
@@ -408,9 +505,8 @@ export function parseFonts(document: Document, verbose: number) {
 }
 
 export function parseColorThemes(document: Document, verbose: number) {
-    const colorThemeTags = document
-        .getElementsByTagName('color-themes')[0]
-        .getElementsByTagName('color-theme');
+    let colorThemeTagsInterm = getTopAndMark(document, 'color-themes');
+    let colorThemeTags = getTopChildrenAndMark(colorThemeTagsInterm, 'color-theme');
     const colorSetTags = document.getElementsByTagName('colors');
     const themes = [];
     let defaultTheme = '';
@@ -423,7 +519,7 @@ export function parseColorThemes(document: Document, verbose: number) {
             name: theme,
             enabled: tag.attributes.getNamedItem('enabled')?.value === 'true',
             colorSets: Array.from(colorSetTags).map((cst) => {
-                const colorTags = cst.getElementsByTagName('color');
+                const colorTags = getTopChildrenAndMark(cst, 'color');//cst.getElementsByTagName('color');
                 const colors: { [key: string]: string } = {};
                 for (const color of colorTags) {
                     const cm = color.querySelector(`cm[theme="${theme}"]`);
@@ -469,7 +565,8 @@ export function parseColorThemes(document: Document, verbose: number) {
 }
 
 export function parseTraits(document: Document, dataDir: string, verbose: number) {
-    const traitTags = document.getElementsByTagName('traits')[0]?.getElementsByTagName('trait');
+    //const traitTags = document.getElementsByTagName('traits')[0]?.getElementsByTagName('trait');
+    const traitTags = getTopChildrenAndMark(getTopAndMark(document, 'traits'), 'trait');
     const traits: { [key: string]: any } = {};
 
     if (traitTags?.length > 0) {
@@ -494,7 +591,11 @@ export function parseBookCollections(document: Document, verbose: number) {
 
     for (const tag of booksTags) {
         if (verbose >= 2) console.log(`Converting Collection: ${tag.id}`);
-        const featuresTags = tag.querySelector('features[type=bc]')?.getElementsByTagName('e');
+        const featuresTagsPre = getTopChildrenAndMark(tag, "features");
+        let featuresTags; // double check the "let" is okay
+        for (let element of featuresTagsPre) {
+            if (element.getAttribute("type") == "bc") featuresTags = element.getElementsByTagName('e');
+        }
         if (!featuresTags) throw 'Book collection feature tags missing';
         const features: any = {};
         if (verbose >= 2) console.log(`. features`);
@@ -504,7 +605,8 @@ export function parseBookCollections(document: Document, verbose: number) {
             );
         }
         const books: BookCollectionConfig['books'] = [];
-        const bookTags = tag.getElementsByTagName('book');
+        //const bookTags = tag.getElementsByTagName('book');
+        const bookTags = getTopChildrenAndMark(tag, 'book');
         for (const book of bookTags) {
             if (verbose >= 2) console.log(`. book: ${book.id}`);
             const audio: BookCollectionAudioConfig[] = [];
@@ -569,8 +671,8 @@ export function parseBookCollections(document: Document, verbose: number) {
             const fontChoiceTag = book.querySelector('font-choice');
             const fonts = fontChoiceTag
                 ? Array.from(fontChoiceTag.getElementsByTagName('font-choice-family'))
-                      .filter((x) => fontFamilies.includes(x.innerHTML))
-                      .map((x) => x.innerHTML)
+                    .filter((x) => fontFamilies.includes(x.innerHTML))
+                    .map((x) => x.innerHTML)
                 : [];
             const bkAdditionalNames = book.querySelector('additional-names');
             const additionalNames = bkAdditionalNames
@@ -621,22 +723,22 @@ export function parseBookCollections(document: Document, verbose: number) {
             });
             if (verbose >= 3) console.log(`.... book: `, JSON.stringify(books[0]));
         }
-        const collectionNameTags = tag.getElementsByTagName('book-collection-name');
-        const collectionName = collectionNameTags[0].innerHTML.length
-            ? collectionNameTags[0].innerHTML
+        const collectionNameTags = getTopTagAndMark(tag, 'book-collection-name');//tag.getElementsByTagName('book-collection-name');
+        const collectionName = collectionNameTags.innerHTML.length
+            ? collectionNameTags.innerHTML
             : undefined;
         if (verbose >= 2) console.log(`.. collectionName: `, collectionName);
-        const stylesTag = tag.getElementsByTagName('styles-info')[0];
+        const stylesTag = getTopTagAndMark(tag, 'styles-info');
         if (verbose >= 3) console.log(`.... styles: `, JSON.stringify(stylesTag));
-        const fontChoiceTag = tag.getElementsByTagName('font-choice')[0];
+        const fontChoiceTag = getTopTagAndMark(tag, 'font-choice');
         if (verbose >= 3) console.log(`.... fontChoice: `, JSON.stringify(fontChoiceTag));
         const fonts = fontChoiceTag
             ? Array.from(fontChoiceTag.getElementsByTagName('font-choice-family'))
-                  .filter((x) => fontFamilies.includes(x.innerHTML))
-                  .map((x) => x.innerHTML)
+                .filter((x) => fontFamilies.includes(x.innerHTML))
+                .map((x) => x.innerHTML)
             : [];
 
-        const writingSystem = tag.getElementsByTagName('writing-system')[0];
+        const writingSystem = getTopTagAndMark(tag, 'writing-system');
         if (verbose >= 3) console.log(`.... writingSystem: `, JSON.stringify(writingSystem));
         if (!writingSystem) {
             throw `BookCollection "${collectionName}" missing writing-system`;
@@ -648,22 +750,22 @@ export function parseBookCollections(document: Document, verbose: number) {
         const languageName = writingSystem
             .getElementsByTagName('display-names')[0]
             ?.getElementsByTagName('form')[0].innerHTML;
-        const collectionDescriptionTags = tag.getElementsByTagName('book-collection-description');
-        const collectionDescription = collectionDescriptionTags[0]?.innerHTML.length
-            ? collectionDescriptionTags[0].innerHTML
+        const collectionDescriptionTags = getTopTagAndMark(tag, 'book-collection-description');
+        const collectionDescription = collectionDescriptionTags?.innerHTML.length
+            ? collectionDescriptionTags.innerHTML
             : undefined;
         if (verbose >= 2) console.log(`.. collectionDescription: `, collectionDescription);
-        const collectionAbbreviationTags = tag.getElementsByTagName('book-collection-abbrev');
-        const collectionAbbreviation = collectionAbbreviationTags[0]?.innerHTML.length
-            ? collectionAbbreviationTags[0].innerHTML
+        const collectionAbbreviationTags = getTopTagAndMark(tag, 'book-collection-abbrev');
+        const collectionAbbreviation = collectionAbbreviationTags?.innerHTML.length
+            ? collectionAbbreviationTags.innerHTML
             : undefined;
         if (verbose >= 2) console.log(`.. collectionAbbreviation: `, collectionAbbreviation);
         const footer = convertCollectionFooter(tag, document);
         if (verbose >= 2) console.log(`.. footer: `, footer);
 
-        const collectionImageTags = tag.getElementsByTagName('image');
-        const collectionImage = collectionImageTags[0]?.innerHTML.length
-            ? tag.id + '-' + collectionImageTags[0].innerHTML
+        const collectionImageTags = getTopTagAndMark(tag, 'image');
+        const collectionImage = collectionImageTags?.innerHTML.length
+            ? tag.id + '-' + collectionImageTags.innerHTML
             : undefined;
 
         const bcStyles = tag.querySelector('styles');
@@ -702,16 +804,15 @@ export function parseBookCollections(document: Document, verbose: number) {
 }
 
 export function parseInterfaceLanguages(document: Document, data: AppConfig, verbose: number) {
-    const interfaceLanguagesTag = document.getElementsByTagName('interface-languages')[0];
+    //const interfaceLanguagesTag = document.getElementsByTagName('interface-languages')[0];
+    const interfaceLanguagesTag = getTopAndMark(document, "interface-languages");
     const useSystemLanguage = parseTrait(interfaceLanguagesTag, 'use-system-language') === 'true';
     const interfaceLanguages: {
         useSystemLanguage: boolean;
         writingSystems: { [key: string]: WritingSystemConfig };
     } = { useSystemLanguage, writingSystems: {} };
 
-    const writingSystemsTags = interfaceLanguagesTag
-        .getElementsByTagName('writing-systems')[0]
-        .getElementsByTagName('writing-system');
+    const writingSystemsTags = getTopChildrenAndMark(getTopTagAndMark(interfaceLanguagesTag, 'writing-systems'), 'writing-system');
 
     for (const tag of writingSystemsTags) {
         const code: string = tag.attributes.getNamedItem('code')!.value;
@@ -811,8 +912,8 @@ export function parseMenuLocalizations(document: Document, verbose: number) {
     for (const translationMappingsTag of translationMappingsTags) {
         const defaultLang = translationMappingsTag.attributes.getNamedItem('default-lang')!.value;
         translationMappings.defaultLang = defaultLang;
-        const translationMappingsTags = translationMappingsTag.getElementsByTagName('tm');
-
+        //const translationMappingsTags = translationMappingsTag.getElementsByTagName('tm');
+        const translationMappingsTags = getTopChildrenAndMark(translationMappingsTag, 'tm'); // IS THIS MESSY?
         for (const tag of translationMappingsTags) {
             if (verbose >= 2) console.log(`.. translationMapping: ${tag.id}`);
             const localizations: Record<string, string> = {};
@@ -835,7 +936,8 @@ export function parseMenuLocalizations(document: Document, verbose: number) {
 export function parseKeys(document: Document, verbose: number) {
     if (document.getElementsByTagName('keys').length > 0) {
         const keys = Array.from(
-            document.getElementsByTagName('keys')[0].getElementsByTagName('key')
+            //document.getElementsByTagName('keys')[0].getElementsByTagName('key')
+            getTopChildrenAndMark(getTopAndMark(document, 'keys'), 'key')
         ).map((key) => key.innerHTML);
         if (verbose) console.log(`Converted ${keys.length} keys`);
 
@@ -899,7 +1001,8 @@ export function parseFirebase(document: Document, verbose: number) {
 
     // Iterate over firebaseElements and update data.firebase.features
     for (const firebaseElement of firebaseElements) {
-        const featuresElements = firebaseElement.getElementsByTagName('features');
+        //const featuresElements = firebaseElement.getElementsByTagName('features');
+        const featuresElements = getTopChildrenAndMark(firebaseElement, 'features'); // MESSY
 
         for (const featuresElement of featuresElements) {
             const eElements = featuresElement.getElementsByTagName('e');
@@ -921,9 +1024,9 @@ export function parseFirebase(document: Document, verbose: number) {
 }
 
 export function parseAudioSources(document: Document, verbose: number) {
-    const audioSources = document
-        .getElementsByTagName('audio-sources')[0]
-        ?.getElementsByTagName('audio-source');
+    const audioSources = getTopChildrenAndMark(getTopAndMark(document, "audio-sources"), 'audio-source');//document
+    //.getElementsByTagName('audio-sources')[0]
+    //?.getElementsByTagName('audio-source');
     const sources: {
         [key: string]: {
             type: string;
@@ -988,17 +1091,19 @@ export function parseAudioSources(document: Document, verbose: number) {
 }
 
 export function parseVideos(document: Document, verbose: number) {
-    const videoTags = document.getElementsByTagName('videos')[0]?.getElementsByTagName('video');
+    const videoTags = getTopChildrenAndMark(getTopAndMark(document, 'videos'),
+        //document.getElementsByTagName('videos')[0]
+        'video');
     const videos: any[] = [];
     if (videoTags?.length > 0) {
         for (const tag of videoTags) {
             const placementTag = tag.getElementsByTagName('placement')[0];
             const placement = placementTag
                 ? {
-                      pos: placementTag.attributes.getNamedItem('pos')!.value,
-                      ref: placementTag.attributes.getNamedItem('ref')!.value.split('|')[1],
-                      collection: placementTag.attributes.getNamedItem('ref')!.value.split('|')[0]
-                  }
+                    pos: placementTag.attributes.getNamedItem('pos')!.value,
+                    ref: placementTag.attributes.getNamedItem('ref')!.value.split('|')[1],
+                    collection: placementTag.attributes.getNamedItem('ref')!.value.split('|')[0]
+                }
                 : undefined;
 
             const width = tag.getAttribute('width') ? parseInt(tag.getAttribute('width')!) : 0;
@@ -1036,8 +1141,8 @@ export function parseIllustrations(document: Document, verbose: number) {
     if (imagesTags?.length > 0) {
         for (const tag of imagesTags) {
             if (tag.getAttribute('type') === 'illustration') {
-                const illustrationTags = tag.getElementsByTagName('image');
-
+                //const illustrationTags = tag.getElementsByTagName('image');
+                const illustrationTags = getTopChildrenAndMark(tag, 'image');
                 for (const image of illustrationTags) {
                     const filename =
                         image.getElementsByTagName('filename')[0]?.innerHTML || image.innerHTML;
@@ -1051,11 +1156,11 @@ export function parseIllustrations(document: Document, verbose: number) {
                     const placementTag = image.getElementsByTagName('placement')[0];
                     const placement = placementTag
                         ? {
-                              pos: placementTag.getAttribute('pos')! || '',
-                              ref: placementTag.getAttribute('ref')?.split('|')[1] || '',
-                              caption: placementTag.getAttribute('caption') || '',
-                              collection: placementTag.getAttribute('ref')?.split('|')[0] || ''
-                          }
+                            pos: placementTag.getAttribute('pos')! || '',
+                            ref: placementTag.getAttribute('ref')?.split('|')[1] || '',
+                            caption: placementTag.getAttribute('caption') || '',
+                            collection: placementTag.getAttribute('ref')?.split('|')[0] || ''
+                        }
                         : undefined;
 
                     illustrations.push({ filename, width, height, placement });
@@ -1068,11 +1173,12 @@ export function parseIllustrations(document: Document, verbose: number) {
 }
 
 export function parseLayouts(document: Document, bookCollections: any, verbose: number) {
-    const layoutRoot = document.getElementsByTagName('layouts')[0];
+    //const layoutRoot = document.getElementsByTagName('layouts')[0];
+    const layoutRoot = getTopAndMark(document, 'layouts');
     let defaultLayout = layoutRoot?.getAttribute('default');
     const layouts = [];
 
-    const layoutTags = layoutRoot?.getElementsByTagName('layout');
+    const layoutTags = getTopChildrenAndMark(layoutRoot!, 'layout');
     if (layoutTags?.length > 0) {
         for (const layout of layoutTags) {
             const mode = layout.getAttribute('mode')!;
@@ -1092,8 +1198,8 @@ export function parseLayouts(document: Document, bookCollections: any, verbose: 
             const layoutCollections =
                 layoutCollectionElements.length > 0
                     ? Array.from(layoutCollectionElements).map((element) => {
-                          return element.attributes.getNamedItem('id')!.value;
-                      })
+                        return element.attributes.getNamedItem('id')!.value;
+                    })
                     : [bookCollections[0].id];
 
             layouts.push({
@@ -1110,9 +1216,15 @@ export function parseLayouts(document: Document, bookCollections: any, verbose: 
 }
 
 export function parseBackgroundImages(document: Document, verbose: number) {
-    const backgroundImageTags = document
-        .querySelector('images[type=background]')
-        ?.getElementsByTagName('image');
+    //const backgroundImageTags = document
+    //    .querySelector('images[type=background]')
+    //    ?.getElementsByTagName('image');
+
+    // BAD. MESSY. CODE.
+
+    const backgroundImageHead = document
+        .querySelector('images[type=background]');
+    const backgroundImageTags = getTopChildrenAndMark(backgroundImageHead!, 'image');
     const backgroundImages = [];
     if (backgroundImageTags) {
         for (const backgroundImage of backgroundImageTags) {
@@ -1128,9 +1240,14 @@ export function parseBackgroundImages(document: Document, verbose: number) {
 }
 
 export function parseWatermarkImages(document: Document, verbose: number) {
-    const watermarkImageTags = document
-        .querySelector('images[type=watermark]')
-        ?.getElementsByTagName('image');
+    //const watermarkImageTags = document
+    //    .querySelector('images[type=watermark]')
+    //    ?.getElementsByTagName('image');
+
+    // BAD. MESSY. CODE
+    const watermarkImageHead = document
+        .querySelector('images[type=watermark]');
+    const watermarkImageTags = getTopChildrenAndMark(watermarkImageHead!, 'image');
     const watermarkImages = [];
     if (watermarkImageTags) {
         for (const watermarkImage of watermarkImageTags) {
@@ -1147,7 +1264,11 @@ export function parseWatermarkImages(document: Document, verbose: number) {
 
 export function parseMenuItems(document: Document, type: string, verbose: number) {
     const firstMenuItemsByType = document.querySelector(`menu-items[type="${type}"]`);
-    const menuItemTags = firstMenuItemsByType?.getElementsByTagName('menu-item');
+    //const menuItemTags = firstMenuItemsByType?.getElementsByTagName('menu-item');
+
+    // MESSY BAD CODE THAT NEEDS TO HAVE ERROR CHECKING WHEN PROTOTYPE CONFIRMED
+
+    const menuItemTags = getTopChildrenAndMark(firstMenuItemsByType!, 'menu-item');
     const menuItems = [];
     if (menuItemTags && menuItemTags?.length > 0) {
         for (const menuItem of menuItemTags) {
@@ -1219,10 +1340,13 @@ export function parsePlans(document: Document, verbose: number) {
         image?: { width: number; height: number; file: string };
     }[] = [];
 
+    const plansTag = getTopAndMark(document, 'plans');
+
     const plansTags = document.getElementsByTagName('plans');
-    if (plansTags?.length > 0) {
-        const plansTag = plansTags[0];
-        const featuresTag = plansTag.getElementsByTagName('features')[0];
+    if (plansTag) {
+        //const plansTag = plansTags[0];
+        //const featuresTag = plansTag.getElementsByTagName('features')[0];
+        const featuresTag = getTopChildrenAndMark(plansTag, 'features')[0];
         if (featuresTag) {
             for (const feature of featuresTag.getElementsByTagName('e')) {
                 const name = feature.attributes.getNamedItem('name')!.value;
@@ -1233,25 +1357,25 @@ export function parsePlans(document: Document, verbose: number) {
             }
         }
 
-        const planTags = plansTag.getElementsByTagName('plan');
-        if (planTags?.length > 0) {
-            for (const tag of planTags) {
-                const titleTags = tag.getElementsByTagName('title')[0].getElementsByTagName('t');
-                const title: { [lang: string]: string } = {};
-                for (const titleTag of titleTags) {
-                    title[titleTag.attributes.getNamedItem('lang')!.value] = titleTag.innerHTML;
-                }
-                // Image
-                const imageTag = tag.getElementsByTagName('image')[0];
+        const tag = getTopTagAndMark(plansTag, 'plan'); // WHAT ABOUT MULTIPLE PLANS
+        if (tag) {
+            //for (const tag of planTags) {
+            const titleTags = tag.getElementsByTagName('title')[0].getElementsByTagName('t');
+            const title: { [lang: string]: string } = {};
+            for (const titleTag of titleTags) {
+                title[titleTag.attributes.getNamedItem('lang')!.value] = titleTag.innerHTML;
+            }
+            // Image
+            const imageTag = tag.getElementsByTagName('image')[0];
 
-                let image = undefined;
-                if (imageTag?.innerHTML) {
-                    image = {
-                        width: Number(imageTag.attributes.getNamedItem('width')!.value),
-                        height: Number(imageTag.attributes.getNamedItem('height')!.value),
-                        file: imageTag.innerHTML
-                    };
-                }
+            let image = undefined;
+            if (imageTag?.innerHTML) {
+                image = {
+                    width: Number(imageTag.attributes.getNamedItem('width')!.value),
+                    height: Number(imageTag.attributes.getNamedItem('height')!.value),
+                    file: imageTag.innerHTML
+                };
+                //}
 
                 const filename = tag.getElementsByTagName('filename')[0].innerHTML;
                 const ext = extname(filename);
