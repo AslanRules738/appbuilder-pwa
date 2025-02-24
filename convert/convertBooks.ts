@@ -194,6 +194,45 @@ function addParagraphMarkersAroundTableRows(text: string): string {
     return text.replace(/((?:\\tr [^\n]*\n)+)/g, '\n\\p\n$1\\p\n');
 }
 
+function moveFigureToNextNonVerseMarker(text: string): string {
+    const result = [];
+    let carryOverFigures: string[] = [];
+
+    const lines = text.split('\n');
+    for (let line of lines) {
+        // Add any figures that were carried over from the previous lines
+        if (carryOverFigures.length > 0) {
+            if (!line.startsWith('\\v ') && !line.startsWith('\\fig')) {
+                result.push(...carryOverFigures);
+                carryOverFigures = [];
+            }
+        }
+
+        const figureMatches = line.match(/(\\fig.*?\\fig\*)/g);
+        if (figureMatches) {
+            // Remove the figure content from the current line and add it to the carry over list
+            let modifiedLine = line;
+            figureMatches.forEach((figure) => {
+                modifiedLine = modifiedLine.replace(figure, '');
+                carryOverFigures.push(figure);
+            });
+            if (modifiedLine.trim()) {
+                result.push(modifiedLine);
+            }
+        } else {
+            result.push(line);
+        }
+    }
+
+    // If there are any figures left to carry over, add them to the end of the document
+    if (carryOverFigures.length > 0) {
+        result.push(...carryOverFigures);
+    }
+
+    // Join the lines back together
+    return result.join('\n');
+}
+
 type FilterFunction = (text: string, bcId: string, bookId: string) => string;
 
 const usfmFilterFunctions: FilterFunction[] = [
@@ -204,7 +243,8 @@ const usfmFilterFunctions: FilterFunction[] = [
     handleNoCaptionFigures,
     removeMissingFigures,
     trimTrailingWhitespace,
-    addParagraphMarkersAroundTableRows
+    addParagraphMarkersAroundTableRows,
+    moveFigureToNextNonVerseMarker
 ];
 
 const htmlFilterFunctions: FilterFunction[] = [updateImgTags, trimTrailingWhitespace];
@@ -630,7 +670,13 @@ function convertScriptureBook(
         //query Proskomma with a mutation to add a document
         //more efficient than original pk.addDocument call
         //as it can be run asynchronously
-        //process.stdout.write(`Adding: ${book.file}\n${content}\n`);
+        if (context.verbose > 10) {
+            const bookFullDir = path.join(context.dataDir, 'books-full', context.bcId);
+            const bookPath = path.join(bookFullDir, book.file);
+            console.log(`Writing file: ${bookPath}`);
+            fs.mkdirSync(bookFullDir, { recursive: true });
+            fs.writeFileSync(bookPath, content);
+        }
         pk.gqlQuery(
             `mutation {
                 addDocument(
