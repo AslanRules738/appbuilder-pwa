@@ -19,17 +19,19 @@ const fontFamilies: string[] = [];
 
 function getTopAndMark(doc: Document, tagName: string) {
     let theTop = doc.getElementsByTagName(tagName)[0]
-    theTop.setAttribute("dirty", "true");
-    let children = theTop.getElementsByTagName(tagName);
-    for (let i = 0; i < children.length; i++) {
-        children[i].setAttribute("dirty-child", "true");
+    theTop?.setAttribute("dirty", "true");
+    let children = theTop?.getElementsByTagName(tagName);
+    if (theTop) {
+        for (let i = 0; i < children.length; i++) {
+            children[i].setAttribute("dirty-child", "true");
+        }
     }
     return theTop;
 }
 
 function getTopChildrenAndMark(headInstance: Element, tagName: string) {
     headInstance?.setAttribute("dirty", "true");
-    let children = headInstance.getElementsByTagName(tagName);
+    let children = headInstance?.getElementsByTagName(tagName);
     for (let i = 0; i < children.length; i++) {
         children[i].setAttribute("dirty-child", "true");
     }
@@ -37,7 +39,7 @@ function getTopChildrenAndMark(headInstance: Element, tagName: string) {
 }
 
 function getTopTagAndMark(headInstance: Element, tagName: string) {
-    let theTop = headInstance.getElementsByTagName(tagName)[0];
+    let theTop = headInstance?.getElementsByTagName(tagName)[0];
     theTop?.setAttribute("dirty-child", "true");
     return theTop;
 }
@@ -73,9 +75,8 @@ export function parseAdditionalNames(namesTag: Element, verbose: number) {
 }
 export function parseStyles(stylesTag: Element, verbose: number) {
     const styles = [];
-    //const styleTags = stylesTag?.getElementsByTagName('style');
-    const styleTags = getTopChildrenAndMark(stylesTag, 'style'); // THIS HAS GOT TO BE MESSY
-    if (!styleTags) throw new Error('Styles tag not found in xml');
+    if (!stylesTag) throw new Error('Styles tag not found in xml');
+    const styleTags = getTopChildrenAndMark(stylesTag, 'style');
     for (const tag of styleTags) {
         //console.log(tag.outerHTML);
         const name = tag.attributes.getNamedItem('name')!.value;
@@ -302,24 +303,30 @@ function convertConfig(dataDir: string, verbose: number) {
         const writingSystems: { [key: string]: DictionaryWritingSystemConfig } = {};
         //const writingSystemsTag = document.getElementsByTagName('writing-systems')[0];
         const writingSystemsTag = getTopAndMark(document, 'writing-systems');
-        const writingSystemTags = writingSystemsTag.getElementsByTagName('writing-system');
-        for (const tag of writingSystemTags) {
-            const writingSystem = parseDictionaryWritingSystem(tag, verbose);
-            const code: string = tag.attributes.getNamedItem('code')!.value;
-            writingSystems[code] = writingSystem;
-        }
-
-        data.writingSystems = writingSystems;
-        // Parsing indexes
         const indexes: { [key: string]: { displayed: boolean } } = {};
+        if (writingSystemsTag) {
+            const writingSystemTags = getTopChildrenAndMark(writingSystemsTag, 'writing-system');
+            for (const tag of writingSystemTags) {
+                const writingSystem = parseDictionaryWritingSystem(tag, verbose);
+                const code: string = tag.attributes.getNamedItem('code')!.value;
+                writingSystems[code] = writingSystem;
+            }
+
+            data.writingSystems = writingSystems;
+        }
+        // Parsing indexes
+
         //const indexesTag = document.getElementsByTagName('indexes')[0];
         const indexesTag = getTopAndMark(document, 'indexes');
-        const indexTags = indexesTag.getElementsByTagName('index');
-        for (const tag of indexTags) {
-            const lang: string = tag.attributes.getNamedItem('lang')!.value;
-            const displayed: boolean = tag.attributes.getNamedItem('displayed')!.value === 'true';
-            indexes[lang] = { displayed };
+        if (indexesTag) {
+            const indexTags = getTopChildrenAndMark(indexesTag, 'index');
+            for (const tag of indexTags) {
+                const lang: string = tag.attributes.getNamedItem('lang')!.value;
+                const displayed: boolean = tag.attributes.getNamedItem('displayed')!.value === 'true';
+                indexes[lang] = { displayed };
+            }
         }
+
         data.indexes = indexes;
     }
 
@@ -388,32 +395,35 @@ function convertConfig(dataDir: string, verbose: number) {
             };
         }
 
-        const excludeList = ["app-name", "package", "apk-filename", "version", "multiple-apks", "android-sdk", "install-location", "ipa-filename", "ipa-version", "ipa-asset-filename", "ipa-app-type", "ipa-container-audio", "pwa-manifest", "database-filename", "about", "deep-linking", "expiry", "security"];
+    }
 
-        let cleanAttribute = document.querySelectorAll(`[dirty=false]`);
+    const excludeList = ["app-name", "package", "apk-filename", "version", "multiple-apks", "android-sdk", "install-location", "ipa-filename", "ipa-version", "ipa-asset-filename", "ipa-app-type", "ipa-container-audio", "pwa-manifest", "database-filename", "about", "deep-linking", "expiry", "security"];
 
-        if (cleanAttribute.length > 0) console.log("---- UNPARSED ELEMENTS HAVE BEEN DETECTED: ----");
+    let cleanAttribute = document.querySelectorAll(`[dirty=false]`);
 
-        let unparsedElements = "";
+    if (cleanAttribute.length > 0) console.log("-------- DETECTED UNPARSED HEAD ELEMENTS: --------");
 
-        for (let att of cleanAttribute) {
-            if (!excludeList.includes(att.nodeName)) {
+    let unparsedElements = "";
 
-                if (att.hasAttribute("type")) {
-                    console.log(att.nodeName, att.getAttribute("type"));
-                    unparsedElements += att.nodeName;
-                    unparsedElements += " ";
-                }
-                else {
-                    console.log(att.nodeName);
-                    unparsedElements += att.nodeName;
-                    unparsedElements += " ";
-                }
+    for (let att of cleanAttribute) {
+        if (!excludeList.includes(att.nodeName)) {
+
+            if (att.hasAttribute("type")) {
+                console.log(att.nodeName, att.getAttribute("type"));
+                unparsedElements += att.nodeName;
+                unparsedElements += " ";
+            }
+            else {
+                console.log(att.nodeName);
+                unparsedElements += att.nodeName;
+                unparsedElements += " ";
             }
         }
+    }
 
-        let cleanChildren = document.querySelectorAll(`[dirty-child=false]`);
-        console.log("### Unparsed children ###");
+    let cleanChildren = document.querySelectorAll(`[dirty-child=false]`);
+    if (cleanChildren.length > 0) {
+        console.log("---- DETECTED UNPARSED DIRECT CHILD ELEMENTS: ----");
         for (let child of cleanChildren) {
             if (child.parentElement?.getAttribute("dirty") == "true") {
                 if (child.parentElement!.nodeName == "books") {
@@ -422,23 +432,19 @@ function convertConfig(dataDir: string, verbose: number) {
                 else {
                     console.log(child.parentElement!.nodeName, ": ", child.nodeName);
                 }
+                unparsedElements += child.parentElement!.nodeName;
+                unparsedElements += "/";
+                unparsedElements += child.nodeName;
+                unparsedElements += " ";
             }
         }
+    }
+    console.log("--------------------------------------------------");
 
-        /*let dirtyChildren = document.querySelectorAll(`[dirty-child=true]`);
-        for (let child of dirtyChildren) {
-            if (child.parentElement?.getAttribute("dirty") == "true") {
-                console.log("Normal dirty:", child.nodeName, "of", child.parentElement!.nodeName);
-            }
-            else console.log("Head misparse error:", child.nodeName, "of", child.parentElement!.nodeName);
-        }*/
-
-        if (unparsedElements == "") {
-            writeFileSync('./convert/output/unparsedElements.txt', "passed");
-        } else {
-            writeFileSync('./convert/output/unparsedElements.txt', unparsedElements);
-        }
-
+    if (unparsedElements == "") {
+        writeFileSync('./convert/output/unparsedElements.txt', "passed");
+    } else {
+        writeFileSync('./convert/output/unparsedElements.txt', unparsedElements);
     }
 
     /*
@@ -482,105 +488,109 @@ export function parseFeatures(document: Document, verbose: number) {
 }
 
 export function parseFonts(document: Document, verbose: number) {
-    //const fontTags = document.getElementsByTagName('fonts')[0].getElementsByTagName('font');
     const fonts = [];
-    const fontTags = getTopChildrenAndMark(getTopAndMark(document, 'fonts'), 'font');
-    for (const tag of fontTags) {
-        const family = tag.attributes.getNamedItem('family')!.value;
-        const name = tag.getElementsByTagName('display-name')[0]?.innerHTML;
-        const file = tag.getElementsByTagName('f')[0].innerHTML;
-        const fontStyle = tag
-            .querySelector('sd[property=font-style]')!
-            .attributes.getNamedItem('value')!.value;
-        const fontWeight = tag
-            .querySelector('sd[property=font-weight]')!
-            .attributes.getNamedItem('value')!.value;
-        fontFamilies.push(family);
-        fonts.push({ family, name, file, fontStyle, fontWeight });
+    const headFontTag = getTopAndMark(document, 'fonts');
+    if (headFontTag) {
+        const fontTags = getTopChildrenAndMark(headFontTag, 'font');
+        for (const tag of fontTags) {
+            const family = tag.attributes.getNamedItem('family')!.value;
+            const name = tag.getElementsByTagName('display-name')[0]?.innerHTML;
+            const file = tag.getElementsByTagName('f')[0].innerHTML;
+            const fontStyle = tag
+                .querySelector('sd[property=font-style]')!
+                .attributes.getNamedItem('value')!.value;
+            const fontWeight = tag
+                .querySelector('sd[property=font-weight]')!
+                .attributes.getNamedItem('value')!.value;
+            fontFamilies.push(family);
+            fonts.push({ family, name, file, fontStyle, fontWeight });
+        }
+
+        if (verbose) console.log(`Converted ${fonts.length} fonts`);
     }
-
-    if (verbose) console.log(`Converted ${fonts.length} fonts`);
-
     return fonts;
 }
 
 export function parseColorThemes(document: Document, verbose: number) {
     let colorThemeTagsInterm = getTopAndMark(document, 'color-themes');
-    let colorThemeTags = getTopChildrenAndMark(colorThemeTagsInterm, 'color-theme');
-    const colorSetTags = document.getElementsByTagName('colors');
     const themes = [];
     let defaultTheme = '';
+    if (colorThemeTagsInterm) {
+        let colorThemeTags = getTopChildrenAndMark(colorThemeTagsInterm, 'color-theme');
+        const colorSetTags = document.getElementsByTagName('colors');
 
-    for (const tag of colorThemeTags) {
-        const theme = tag.attributes.getNamedItem('name')!.value;
-        if (verbose >= 2) console.log(`. theme ${theme}`);
+        for (const tag of colorThemeTags) {
+            const theme = tag.attributes.getNamedItem('name')!.value;
+            if (verbose >= 2) console.log(`. theme ${theme}`);
 
-        themes.push({
-            name: theme,
-            enabled: tag.attributes.getNamedItem('enabled')?.value === 'true',
-            colorSets: Array.from(colorSetTags).map((cst) => {
-                const colorTags = getTopChildrenAndMark(cst, 'color');//cst.getElementsByTagName('color');
-                const colors: { [key: string]: string } = {};
-                for (const color of colorTags) {
-                    const cm = color.querySelector(`cm[theme="${theme}"]`);
-                    const name = color.getAttribute('name');
-                    const value = cm?.getAttribute('value');
-                    if (name && value) colors[name] = value;
-                    if (verbose >= 3) console.log(`.. colors[${name}]=${value} `);
-                }
-                if (verbose >= 3) console.log(`.. done with colorTags`);
-
-                Object.keys(colors).forEach((x) => {
-                    if (verbose >= 3) console.log(`.. ${x}: colors[${x}]=${colors[x]}`);
-                    while (!colors[x].startsWith('#')) {
-                        const key = colors[x];
-                        const value = colors[key];
-                        if (value === x) {
-                            throw `Color value equals color name! Can't Resolve!\ncolor=${x}, theme=${theme}, value=${value} `;
-                        }
-                        if (!value) {
-                            break;
-                        }
-                        colors[x] = value;
+            themes.push({
+                name: theme,
+                enabled: tag.attributes.getNamedItem('enabled')?.value === 'true',
+                colorSets: Array.from(colorSetTags).map((cst) => {
+                    const colorTags = getTopChildrenAndMark(cst, 'color');//cst.getElementsByTagName('color');
+                    const colors: { [key: string]: string } = {};
+                    for (const color of colorTags) {
+                        const cm = color.querySelector(`cm[theme="${theme}"]`);
+                        const name = color.getAttribute('name');
+                        const value = cm?.getAttribute('value');
+                        if (name && value) colors[name] = value;
+                        if (verbose >= 3) console.log(`.. colors[${name}]=${value} `);
                     }
-                });
-                if (verbose >= 3) console.log(`.. done with resolving colors`);
+                    if (verbose >= 3) console.log(`.. done with colorTags`);
 
-                const type = cst.getAttribute('type')!;
-                if (verbose >= 2) console.log(`.. ${type}: ${JSON.stringify(colors)}`);
-                return {
-                    type,
-                    colors
-                };
-            })
-        });
+                    Object.keys(colors).forEach((x) => {
+                        if (verbose >= 3) console.log(`.. ${x}: colors[${x}]=${colors[x]}`);
+                        while (!colors[x].startsWith('#')) {
+                            const key = colors[x];
+                            const value = colors[key];
+                            if (value === x) {
+                                throw `Color value equals color name! Can't Resolve!\ncolor=${x}, theme=${theme}, value=${value} `;
+                            }
+                            if (!value) {
+                                break;
+                            }
+                            colors[x] = value;
+                        }
+                    });
+                    if (verbose >= 3) console.log(`.. done with resolving colors`);
 
-        if (tag.attributes.getNamedItem('default')?.value === 'true')
-            defaultTheme = themes[themes.length - 1].name;
+                    const type = cst.getAttribute('type')!;
+                    if (verbose >= 2) console.log(`.. ${type}: ${JSON.stringify(colors)}`);
+                    return {
+                        type,
+                        colors
+                    };
+                })
+            });
+
+            if (tag.attributes.getNamedItem('default')?.value === 'true')
+                defaultTheme = themes[themes.length - 1].name;
+        }
+
+        if (verbose) console.log(`Converted ${themes.length} themes`);
     }
-
-    if (verbose) console.log(`Converted ${themes.length} themes`);
-
     return { themes, defaultTheme };
 }
 
 export function parseTraits(document: Document, dataDir: string, verbose: number) {
-    //const traitTags = document.getElementsByTagName('traits')[0]?.getElementsByTagName('trait');
-    const traitTags = getTopChildrenAndMark(getTopAndMark(document, 'traits'), 'trait');
+    const headTraitTag = getTopAndMark(document, 'traits');
     const traits: { [key: string]: any } = {};
+    if (headTraitTag) {
+        const traitTags = getTopChildrenAndMark(headTraitTag, 'trait');
 
-    if (traitTags?.length > 0) {
-        for (const tag of traitTags) {
-            traits[tag.attributes.getNamedItem('name')!.value] =
-                tag.attributes.getNamedItem('value')?.value === 'true';
+        if (traitTags?.length > 0) {
+            for (const tag of traitTags) {
+                traits[tag.attributes.getNamedItem('name')!.value] =
+                    tag.attributes.getNamedItem('value')?.value === 'true';
+            }
         }
+
+        // Add traits
+        traits['has-borders'] = !dirEmpty(path.join(dataDir, 'borders'));
+        traits['has-illustrations'] = !dirEmpty(path.join(dataDir, 'illustrations'));
+
+        if (verbose) console.log(`Converted ${Object.keys(traits).length} traits`);
     }
-
-    // Add traits
-    traits['has-borders'] = !dirEmpty(path.join(dataDir, 'borders'));
-    traits['has-illustrations'] = !dirEmpty(path.join(dataDir, 'illustrations'));
-
-    if (verbose) console.log(`Converted ${Object.keys(traits).length} traits`);
 
     return traits;
 }
@@ -812,21 +822,24 @@ export function parseInterfaceLanguages(document: Document, data: AppConfig, ver
         writingSystems: { [key: string]: WritingSystemConfig };
     } = { useSystemLanguage, writingSystems: {} };
 
-    const writingSystemsTags = getTopChildrenAndMark(getTopTagAndMark(interfaceLanguagesTag, 'writing-systems'), 'writing-system');
+    const headWritingSystemTag = getTopTagAndMark(interfaceLanguagesTag, 'writing-systems');
+    if (headWritingSystemTag) {
+        const writingSystemsTags = getTopChildrenAndMark(headWritingSystemTag, 'writing-system');
 
-    for (const tag of writingSystemsTags) {
-        const code: string = tag.attributes.getNamedItem('code')!.value;
-        const writingSystem = parseWritingSystem(tag, verbose);
-        interfaceLanguages.writingSystems[code] = writingSystem;
+        for (const tag of writingSystemsTags) {
+            const code: string = tag.attributes.getNamedItem('code')!.value;
+            const writingSystem = parseWritingSystem(tag, verbose);
+            interfaceLanguages.writingSystems[code] = writingSystem;
 
-        if (verbose >= 2) {
-            console.log(`.. writing system ${code}`);
+            if (verbose >= 2) {
+                console.log(`.. writing system ${code}`);
+            }
         }
+        if (verbose)
+            console.log(
+                `Converted ${Object.keys(interfaceLanguages.writingSystems).length} writing systems`
+            );
     }
-    if (verbose)
-        console.log(
-            `Converted ${Object.keys(interfaceLanguages.writingSystems).length} writing systems`
-        );
     return interfaceLanguages;
 }
 
@@ -912,8 +925,7 @@ export function parseMenuLocalizations(document: Document, verbose: number) {
     for (const translationMappingsTag of translationMappingsTags) {
         const defaultLang = translationMappingsTag.attributes.getNamedItem('default-lang')!.value;
         translationMappings.defaultLang = defaultLang;
-        //const translationMappingsTags = translationMappingsTag.getElementsByTagName('tm');
-        const translationMappingsTags = getTopChildrenAndMark(translationMappingsTag, 'tm'); // IS THIS MESSY?
+        const translationMappingsTags = getTopChildrenAndMark(translationMappingsTag, 'tm');
         for (const tag of translationMappingsTags) {
             if (verbose >= 2) console.log(`.. translationMapping: ${tag.id}`);
             const localizations: Record<string, string> = {};
@@ -961,7 +973,8 @@ export function parseAnalytics(document: Document, verbose: number) {
             analytics.enabled = true;
 
             // Get all analytics-provider elements within the current analytics element
-            const providerElements = analyticsElement.getElementsByTagName('analytics-provider');
+            const providerElements = getTopChildrenAndMark(analyticsElement, 'analytics-provider');
+            //const providerElements = analyticsElement.getElementsByTagName('analytics-provider');
 
             // Iterate over provider elements to construct the providers array
             for (const providerElement of providerElements) {
@@ -1001,8 +1014,7 @@ export function parseFirebase(document: Document, verbose: number) {
 
     // Iterate over firebaseElements and update data.firebase.features
     for (const firebaseElement of firebaseElements) {
-        //const featuresElements = firebaseElement.getElementsByTagName('features');
-        const featuresElements = getTopChildrenAndMark(firebaseElement, 'features'); // MESSY
+        const featuresElements = getTopChildrenAndMark(firebaseElement, 'features');
 
         for (const featuresElement of featuresElements) {
             const eElements = featuresElement.getElementsByTagName('e');
@@ -1024,9 +1036,7 @@ export function parseFirebase(document: Document, verbose: number) {
 }
 
 export function parseAudioSources(document: Document, verbose: number) {
-    const audioSources = getTopChildrenAndMark(getTopAndMark(document, "audio-sources"), 'audio-source');//document
-    //.getElementsByTagName('audio-sources')[0]
-    //?.getElementsByTagName('audio-source');
+    const audioSourceTag = getTopAndMark(document, "audio-sources");
     const sources: {
         [key: string]: {
             type: string;
@@ -1039,35 +1049,38 @@ export function parseAudioSources(document: Document, verbose: number) {
         };
     } = {};
     const files: { name: string; src: string }[] = [];
+    if (audioSourceTag) {
+        const audioSources = getTopChildrenAndMark(audioSourceTag, 'audio-source');
 
-    if (audioSources?.length > 0) {
-        for (const source of audioSources) {
-            const id = source.getAttribute('id')!;
-            if (verbose >= 2) console.log(`Converting audioSource: ${id}`);
-            const type = source.getAttribute('type')!;
-            const name = source.getElementsByTagName('name')[0].innerHTML;
+        if (audioSources?.length > 0) {
+            for (const source of audioSources) {
+                const id = source.getAttribute('id')!;
+                if (verbose >= 2) console.log(`Converting audioSource: ${id}`);
+                const type = source.getAttribute('type')!;
+                const name = source.getElementsByTagName('name')[0].innerHTML;
 
-            sources[id] = { type, name };
+                sources[id] = { type, name };
 
-            if (type !== 'assets') {
-                sources[id].accessMethods = source
-                    .getElementsByTagName('access-methods')[0]
-                    ?.getAttribute('value')!
-                    .toString()
-                    .split('|');
-                sources[id].folder = source.getElementsByTagName('folder')[0]?.innerHTML;
+                if (type !== 'assets') {
+                    sources[id].accessMethods = source
+                        .getElementsByTagName('access-methods')[0]
+                        ?.getAttribute('value')!
+                        .toString()
+                        .split('|');
+                    sources[id].folder = source.getElementsByTagName('folder')[0]?.innerHTML;
 
-                const address = source.getElementsByTagName('address')[0]?.innerHTML;
-                if (isValidUrl(address)) {
-                    sources[id].address = address;
+                    const address = source.getElementsByTagName('address')[0]?.innerHTML;
+                    if (isValidUrl(address)) {
+                        sources[id].address = address;
+                    }
+
+                    if (type === 'fcbh') {
+                        sources[id].key = source.getElementsByTagName('key')[0].innerHTML;
+                        sources[id].damId = source.getElementsByTagName('dam-id')[0].innerHTML;
+                    }
                 }
-
-                if (type === 'fcbh') {
-                    sources[id].key = source.getElementsByTagName('key')[0].innerHTML;
-                    sources[id].damId = source.getElementsByTagName('dam-id')[0].innerHTML;
-                }
+                if (verbose >= 3) console.log(`....`, JSON.stringify(sources[id]));
             }
-            if (verbose >= 3) console.log(`....`, JSON.stringify(sources[id]));
         }
 
         // Audio files
@@ -1084,54 +1097,56 @@ export function parseAudioSources(document: Document, verbose: number) {
                 files.push({ name: filename, src });
             }
         }
+        if (verbose) console.log(`Converted ${audioSources?.length} audio sources`);
     }
-    if (verbose) console.log(`Converted ${audioSources?.length} audio sources`);
 
     return { sources, files };
 }
 
 export function parseVideos(document: Document, verbose: number) {
-    const videoTags = getTopChildrenAndMark(getTopAndMark(document, 'videos'),
-        //document.getElementsByTagName('videos')[0]
-        'video');
+    const headVideoTag = getTopAndMark(document, 'videos');
     const videos: any[] = [];
-    if (videoTags?.length > 0) {
-        for (const tag of videoTags) {
-            const placementTag = tag.getElementsByTagName('placement')[0];
-            const placement = placementTag
-                ? {
-                    pos: placementTag.attributes.getNamedItem('pos')!.value,
-                    ref: placementTag.attributes.getNamedItem('ref')!.value.split('|')[1],
-                    collection: placementTag.attributes.getNamedItem('ref')!.value.split('|')[0]
+    if (headVideoTag) {
+        const videoTags = getTopChildrenAndMark(headVideoTag,
+            //document.getElementsByTagName('videos')[0]
+            'video');
+        if (videoTags?.length > 0) {
+            for (const tag of videoTags) {
+                const placementTag = tag.getElementsByTagName('placement')[0];
+                const placement = placementTag
+                    ? {
+                        pos: placementTag.attributes.getNamedItem('pos')!.value,
+                        ref: placementTag.attributes.getNamedItem('ref')!.value.split('|')[1],
+                        collection: placementTag.attributes.getNamedItem('ref')!.value.split('|')[0]
+                    }
+                    : undefined;
+
+                const width = tag.getAttribute('width') ? parseInt(tag.getAttribute('width')!) : 0;
+                const height = tag.getAttribute('height') ? parseInt(tag.getAttribute('height')!) : 0;
+
+                let onlineUrl = tag.getElementsByTagName('online-url')[0]?.innerHTML || '';
+                if (onlineUrl) {
+                    onlineUrl = convertVideoUrl(onlineUrl);
                 }
-                : undefined;
 
-            const width = tag.getAttribute('width') ? parseInt(tag.getAttribute('width')!) : 0;
-            const height = tag.getAttribute('height') ? parseInt(tag.getAttribute('height')!) : 0;
+                const filenameTag = tag.getElementsByTagName('filename')[0];
+                const filename = filenameTag ? filenameTag.innerHTML : '';
 
-            let onlineUrl = tag.getElementsByTagName('online-url')[0]?.innerHTML || '';
-            if (onlineUrl) {
-                onlineUrl = convertVideoUrl(onlineUrl);
+                videos.push({
+                    id: tag.attributes.getNamedItem('id')!.value,
+                    src: tag.attributes.getNamedItem('src')?.value,
+                    width,
+                    height,
+                    title: tag.getElementsByTagName('title')[0]?.innerHTML,
+                    thumbnail: tag.getElementsByTagName('thumbnail')[0]?.innerHTML,
+                    onlineUrl: decodeFromXml(onlineUrl),
+                    filename,
+                    placement
+                });
             }
-
-            const filenameTag = tag.getElementsByTagName('filename')[0];
-            const filename = filenameTag ? filenameTag.innerHTML : '';
-
-            videos.push({
-                id: tag.attributes.getNamedItem('id')!.value,
-                src: tag.attributes.getNamedItem('src')?.value,
-                width,
-                height,
-                title: tag.getElementsByTagName('title')[0]?.innerHTML,
-                thumbnail: tag.getElementsByTagName('thumbnail')[0]?.innerHTML,
-                onlineUrl: decodeFromXml(onlineUrl),
-                filename,
-                placement
-            });
         }
+        if (verbose) console.log(`Converted ${videoTags?.length} videos`);
     }
-    if (verbose) console.log(`Converted ${videoTags?.length} videos`);
-
     return videos;
 }
 
@@ -1173,156 +1188,147 @@ export function parseIllustrations(document: Document, verbose: number) {
 }
 
 export function parseLayouts(document: Document, bookCollections: any, verbose: number) {
-    //const layoutRoot = document.getElementsByTagName('layouts')[0];
     const layoutRoot = getTopAndMark(document, 'layouts');
     let defaultLayout = layoutRoot?.getAttribute('default');
     const layouts = [];
+    if (layoutRoot) {
+        const layoutTags = getTopChildrenAndMark(layoutRoot!, 'layout');
+        if (layoutTags?.length > 0) {
+            for (const layout of layoutTags) {
+                const mode = layout.getAttribute('mode')!;
+                if (verbose >= 2) console.log(`Converting layout`, mode);
 
-    const layoutTags = getTopChildrenAndMark(layoutRoot!, 'layout');
-    if (layoutTags?.length > 0) {
-        for (const layout of layoutTags) {
-            const mode = layout.getAttribute('mode')!;
-            if (verbose >= 2) console.log(`Converting layout`, mode);
+                const enabled = layout.getAttribute('enabled') === 'true';
 
-            const enabled = layout.getAttribute('enabled') === 'true';
-
-            const features: { [key: string]: string } = {};
-            const featureElements = layout.getElementsByTagName('features')[0];
-            if (featureElements) {
-                for (const feature of featureElements.getElementsByTagName('e')) {
-                    features[feature.getAttribute('name')!] = feature.getAttribute('value')!;
+                const features: { [key: string]: string } = {};
+                const featureElements = layout.getElementsByTagName('features')[0];
+                if (featureElements) {
+                    for (const feature of featureElements.getElementsByTagName('e')) {
+                        features[feature.getAttribute('name')!] = feature.getAttribute('value')!;
+                    }
                 }
+
+                const layoutCollectionElements = layout.getElementsByTagName('layout-collection');
+                const layoutCollections =
+                    layoutCollectionElements.length > 0
+                        ? Array.from(layoutCollectionElements).map((element) => {
+                            return element.attributes.getNamedItem('id')!.value;
+                        })
+                        : [bookCollections[0].id];
+
+                layouts.push({
+                    mode,
+                    enabled,
+                    layoutCollections,
+                    features
+                });
             }
-
-            const layoutCollectionElements = layout.getElementsByTagName('layout-collection');
-            const layoutCollections =
-                layoutCollectionElements.length > 0
-                    ? Array.from(layoutCollectionElements).map((element) => {
-                        return element.attributes.getNamedItem('id')!.value;
-                    })
-                    : [bookCollections[0].id];
-
-            layouts.push({
-                mode,
-                enabled,
-                layoutCollections,
-                features
-            });
         }
+        if (verbose) console.log(`Converted ${layoutTags?.length} layouts`);
     }
-    if (verbose) console.log(`Converted ${layoutTags?.length} layouts`);
 
     return { layouts, defaultLayout };
 }
 
 export function parseBackgroundImages(document: Document, verbose: number) {
-    //const backgroundImageTags = document
-    //    .querySelector('images[type=background]')
-    //    ?.getElementsByTagName('image');
-
-    // BAD. MESSY. CODE.
-
     const backgroundImageHead = document
         .querySelector('images[type=background]');
-    const backgroundImageTags = getTopChildrenAndMark(backgroundImageHead!, 'image');
     const backgroundImages = [];
-    if (backgroundImageTags) {
-        for (const backgroundImage of backgroundImageTags) {
-            const width = backgroundImage.getAttribute('width')!;
-            const height = backgroundImage.getAttribute('height')!;
-            const filename = backgroundImage.innerHTML;
-            backgroundImages.push({ width, height, filename });
+    if (backgroundImageHead) {
+        const backgroundImageTags = getTopChildrenAndMark(backgroundImageHead!, 'image');
+        if (backgroundImageTags) {
+            for (const backgroundImage of backgroundImageTags) {
+                const width = backgroundImage.getAttribute('width')!;
+                const height = backgroundImage.getAttribute('height')!;
+                const filename = backgroundImage.innerHTML;
+                backgroundImages.push({ width, height, filename });
+            }
         }
+        if (verbose) console.log(`Converted ${backgroundImageTags?.length} background images`);
     }
-    if (verbose) console.log(`Converted ${backgroundImageTags?.length} background images`);
-
     return backgroundImages;
 }
 
 export function parseWatermarkImages(document: Document, verbose: number) {
-    //const watermarkImageTags = document
-    //    .querySelector('images[type=watermark]')
-    //    ?.getElementsByTagName('image');
-
-    // BAD. MESSY. CODE
     const watermarkImageHead = document
         .querySelector('images[type=watermark]');
-    const watermarkImageTags = getTopChildrenAndMark(watermarkImageHead!, 'image');
     const watermarkImages = [];
-    if (watermarkImageTags) {
-        for (const watermarkImage of watermarkImageTags) {
-            const width = watermarkImage.getAttribute('width')!;
-            const height = watermarkImage.getAttribute('height')!;
-            const filename = watermarkImage.innerHTML;
-            watermarkImages.push({ width, height, filename });
-        }
-    }
-    if (verbose) console.log(`Converted ${watermarkImageTags?.length} watermark images`);
+    if (watermarkImageHead) {
+        const watermarkImageTags = getTopChildrenAndMark(watermarkImageHead!, 'image');
 
+        if (watermarkImageTags) {
+            for (const watermarkImage of watermarkImageTags) {
+                const width = watermarkImage.getAttribute('width')!;
+                const height = watermarkImage.getAttribute('height')!;
+                const filename = watermarkImage.innerHTML;
+                watermarkImages.push({ width, height, filename });
+            }
+        }
+        if (verbose) console.log(`Converted ${watermarkImageTags?.length} watermark images`);
+    }
     return watermarkImages;
 }
 
 export function parseMenuItems(document: Document, type: string, verbose: number) {
     const firstMenuItemsByType = document.querySelector(`menu-items[type="${type}"]`);
-    //const menuItemTags = firstMenuItemsByType?.getElementsByTagName('menu-item');
-
-    // MESSY BAD CODE THAT NEEDS TO HAVE ERROR CHECKING WHEN PROTOTYPE CONFIRMED
-
-    const menuItemTags = getTopChildrenAndMark(firstMenuItemsByType!, 'menu-item');
     const menuItems = [];
-    if (menuItemTags && menuItemTags?.length > 0) {
-        for (const menuItem of menuItemTags) {
-            const type = menuItem.attributes.getNamedItem('type')!.value;
-            if (verbose >= 2) console.log(`.. Converting menuItem: ${type}`);
-            if (verbose >= 3) console.log('.... menuItem:', menuItem.outerHTML);
+    if (firstMenuItemsByType) {
+        const menuItemTags = getTopChildrenAndMark(firstMenuItemsByType!, 'menu-item');
 
-            const titleTags = menuItem.getElementsByTagName('title')[0].getElementsByTagName('t');
-            const title: { [lang: string]: string } = {};
-            for (const titleTag of titleTags) {
-                title[titleTag.attributes.getNamedItem('lang')!.value] = titleTag.innerHTML;
-            }
+        if (menuItemTags && menuItemTags?.length > 0) {
+            for (const menuItem of menuItemTags) {
+                const type = menuItem.attributes.getNamedItem('type')!.value;
+                if (verbose >= 2) console.log(`.. Converting menuItem: ${type}`);
+                if (verbose >= 3) console.log('.... menuItem:', menuItem.outerHTML);
 
-            const linkTags = menuItem.getElementsByTagName('link')[0]?.getElementsByTagName('t');
-            const link: { [lang: string]: string } = {};
-            if (linkTags) {
-                for (const linkTag of linkTags) {
-                    link[linkTag.attributes.getNamedItem('lang')!.value] = linkTag.innerHTML;
+                const titleTags = menuItem.getElementsByTagName('title')[0].getElementsByTagName('t');
+                const title: { [lang: string]: string } = {};
+                for (const titleTag of titleTags) {
+                    title[titleTag.attributes.getNamedItem('lang')!.value] = titleTag.innerHTML;
                 }
-            }
 
-            const linkIdTags = menuItem
-                .getElementsByTagName('link-id')[0]
-                ?.getElementsByTagName('t');
-            const linkId: { [lang: string]: string } = {};
-            if (linkIdTags) {
-                for (const linkIdTag of linkIdTags) {
-                    linkId[linkIdTag.attributes.getNamedItem('lang')!.value] = linkIdTag.innerHTML;
+                const linkTags = menuItem.getElementsByTagName('link')[0]?.getElementsByTagName('t');
+                const link: { [lang: string]: string } = {};
+                if (linkTags) {
+                    for (const linkTag of linkTags) {
+                        link[linkTag.attributes.getNamedItem('lang')!.value] = linkTag.innerHTML;
+                    }
                 }
-            }
 
-            const imageTags = menuItem
-                .getElementsByTagName('images')[0]
-                ?.getElementsByTagName('image');
-            const images = [];
-            if (imageTags) {
-                for (const imageTag of imageTags) {
-                    images.push({
-                        width: parseInt(imageTag.attributes.getNamedItem('width')!.value),
-                        height: parseInt(imageTag.attributes.getNamedItem('height')!.value),
-                        file: imageTag.innerHTML
-                    });
+                const linkIdTags = menuItem
+                    .getElementsByTagName('link-id')[0]
+                    ?.getElementsByTagName('t');
+                const linkId: { [lang: string]: string } = {};
+                if (linkIdTags) {
+                    for (const linkIdTag of linkIdTags) {
+                        linkId[linkIdTag.attributes.getNamedItem('lang')!.value] = linkIdTag.innerHTML;
+                    }
                 }
+
+                const imageTags = menuItem
+                    .getElementsByTagName('images')[0]
+                    ?.getElementsByTagName('image');
+                const images = [];
+                if (imageTags) {
+                    for (const imageTag of imageTags) {
+                        images.push({
+                            width: parseInt(imageTag.attributes.getNamedItem('width')!.value),
+                            height: parseInt(imageTag.attributes.getNamedItem('height')!.value),
+                            file: imageTag.innerHTML
+                        });
+                    }
+                }
+
+                menuItems.push({
+                    type,
+                    title,
+                    link,
+                    linkId,
+                    images
+                });
+
+                if (verbose >= 3) console.log(`....`, JSON.stringify(menuItems));
             }
-
-            menuItems.push({
-                type,
-                title,
-                link,
-                linkId,
-                images
-            });
-
-            if (verbose >= 3) console.log(`....`, JSON.stringify(menuItems));
         }
     }
 
@@ -1344,8 +1350,6 @@ export function parsePlans(document: Document, verbose: number) {
 
     const plansTags = document.getElementsByTagName('plans');
     if (plansTag) {
-        //const plansTag = plansTags[0];
-        //const featuresTag = plansTag.getElementsByTagName('features')[0];
         const featuresTag = getTopChildrenAndMark(plansTag, 'features')[0];
         if (featuresTag) {
             for (const feature of featuresTag.getElementsByTagName('e')) {
@@ -1357,9 +1361,8 @@ export function parsePlans(document: Document, verbose: number) {
             }
         }
 
-        const tag = getTopTagAndMark(plansTag, 'plan'); // WHAT ABOUT MULTIPLE PLANS
+        const tag = getTopTagAndMark(plansTag, 'plan');
         if (tag) {
-            //for (const tag of planTags) {
             const titleTags = tag.getElementsByTagName('title')[0].getElementsByTagName('t');
             const title: { [lang: string]: string } = {};
             for (const titleTag of titleTags) {
@@ -1375,7 +1378,6 @@ export function parsePlans(document: Document, verbose: number) {
                     height: Number(imageTag.attributes.getNamedItem('height')!.value),
                     file: imageTag.innerHTML
                 };
-                //}
 
                 const filename = tag.getElementsByTagName('filename')[0].innerHTML;
                 const ext = extname(filename);

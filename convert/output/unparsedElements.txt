@@ -1,1 +1,1 @@
-color-scheme markers tab-types assistant 
+color-scheme markers tab-types assistant fonts/font-handling books/metadata books/metadata 
