@@ -256,16 +256,16 @@ function convertConfig(dataDir: string, verbose: number) {
     const data = setConfigType(programType);
 
     // Name
-    data.name = document.getElementsByTagName('app-name')[0].innerHTML;
+    data.name = getTopAndMark(document, 'app-name').innerHTML;//document.getElementsByTagName('app-name')[0].innerHTML;
     if (verbose) console.log(`Converting ${data.name}...`);
 
     // Package
-    data.package = document.getElementsByTagName('package')[0].innerHTML;
+    data.package = getTopAndMark(document, 'package').innerHTML;//document.getElementsByTagName('package')[0].innerHTML;
     if (verbose) console.log(`Converting ${data.package}...`);
 
     // Version
-    data.version = document
-        .getElementsByTagName('version')[0]
+    data.version = getTopAndMark(document, 'version')//document
+        //.getElementsByTagName('version')[0]
         .attributes.getNamedItem('name')!.value;
 
     data.programType = programType;
@@ -397,19 +397,24 @@ function convertConfig(dataDir: string, verbose: number) {
 
     }
 
-    const excludeList = ["app-name", "package", "apk-filename", "version", "multiple-apks", "android-sdk", "install-location", "ipa-filename", "ipa-version", "ipa-asset-filename", "ipa-app-type", "ipa-container-audio", "pwa-manifest", "database-filename", "about", "deep-linking", "expiry", "security"];
+    const excludeList = ["apk-filename", "multiple-apks", "android-sdk", "install-location", "ipa-filename", "ipa-version", "ipa-asset-filename", "ipa-app-type", "ipa-container-audio", "pwa-manifest", "database-filename", "color-scheme", "font-handling"];
+
+    const notImplementedYetList = ["about", "lexicon-db", "fields", "deep-linking", "expiry", "security", "markers", "tab-types", "assistant"];
 
     let cleanAttribute = document.querySelectorAll(`[dirty=false]`);
 
     if (cleanAttribute.length > 0) console.log("-------- DETECTED UNPARSED HEAD ELEMENTS: --------");
 
     let unparsedElements = "";
+    let unimplementedElements = "";
 
     for (let att of cleanAttribute) {
         if (!excludeList.includes(att.nodeName)) {
-
-            if (att.hasAttribute("type")) {
-                console.log(att.nodeName, att.getAttribute("type"));
+            if (notImplementedYetList.includes(att.nodeName)) {
+                unimplementedElements += att.nodeName + "\n";
+            }
+            else if (att.hasAttribute("type")) {
+                console.log(att.nodeName, "of type", att.getAttribute("type"));
                 unparsedElements += att.nodeName;
                 unparsedElements += " ";
             }
@@ -438,6 +443,12 @@ function convertConfig(dataDir: string, verbose: number) {
                 unparsedElements += " ";
             }
         }
+    }
+    if (unimplementedElements.length > 0) {
+        console.log("---------- ELEMENTS NOT YET IMPLEMENTED: ---------");
+        // remove ending newline so people aren't confused into thinking there's some empty node bug
+        unimplementedElements = unimplementedElements.substring(0, unimplementedElements.length - 1);
+        console.log(unimplementedElements);
     }
     console.log("--------------------------------------------------");
 
