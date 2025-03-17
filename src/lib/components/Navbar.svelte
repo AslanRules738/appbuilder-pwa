@@ -45,6 +45,7 @@ The navbar component.
     <div class="dy-navbar-start">
         {#if !showBackButton}
             <label
+                data-testid="hamburger-icon"
                 for="sidebar"
                 class="dy-btn dy-btn-ghost dy-btn-circle p-1 dy-drawer-button"
                 class:lg:hidden={$showDesktopSidebar && $layout.mode !== LAYOUT_TWO}
