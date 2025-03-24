@@ -54,7 +54,11 @@ The navbar component.
             </label>
         {:else}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <button onclick={handleBackNavigation} class="dy-btn dy-btn-ghost dy-btn-circle">
+            <button
+                onclick={handleBackNavigation}
+                data-testid="back-button"
+                class="dy-btn dy-btn-ghost dy-btn-circle"
+            >
                 {#if $direction === 'ltr'}
                     <ArrowBackIcon color="white" />
                 {:else}

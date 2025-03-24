@@ -20,11 +20,15 @@ test('sfdds', async ({ page }) => {
     await page.getByTestId('hamburger-icon').click();
     await page.getByRole('button', { name: "Settings" }).last().click();
 
+    await expect(await page.locator('div.mt').textContent()).toEqual("John");
+    //await expect(page.locator('[class="mt2"]')).toHaveText("The Good News According to");
+
+
     await expect(page.getByText('Verse layout')).toBeVisible();
     const selbox1 = page.getByRole('combobox').filter({ has: page.getByRole('option').filter({ hasText: 'Verses in paragraphs' }) });
     await expect(selbox1).toBeVisible();
     await expect(selbox1).toHaveValue("paragraphs");
-    selbox1.selectOption("one-per-line");
+    await selbox1.selectOption("one-per-line");
     await expect(selbox1).toHaveValue("one-per-line");
 
     await expect(page.getByText('Images in Bible text')).toBeVisible();
@@ -40,4 +44,7 @@ test('sfdds', async ({ page }) => {
     await expect(selbox3).toHaveValue("normal");
     await selbox3.selectOption("hidden");
     await expect(selbox3).toHaveValue("hidden");
+
+    await page.getByTestId('back-button').click();
+    await expect(page.getByText('The Good News According To')).toBeVisible();
 });
