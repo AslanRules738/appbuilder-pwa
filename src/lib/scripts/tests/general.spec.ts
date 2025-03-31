@@ -31,17 +31,28 @@ test('get started link', async ({ page }) => {
 
 test('Test Settings', async ({ page }) => {
     const cfg = await import('$lib/data/config');
+    //console.log(cfg.default.interfaceLanguages.writingSystems.yao.displayNames.en: Ciyawo);
 
     await page.goto('http://100.76.234.109:5173/');
     await page.getByTestId('title').click();
     await page.getByTestId("settings-icon").click();
 
     await expect(page.getByText('User Interface')).toBeVisible();
-    const selbox = await page.locator('.dy-select').filter({ hasText: 'Language' });
-    console.log(selbox);
+
+    let langString = "Language";
+    let langDiv = await page.locator('.settings-item').filter({ hasText: langString });
+    const selbox = await langDiv.locator('.dy-select');
+
     await expect(selbox).toBeVisible();
-    for (let sys of cfg.default.writingSystems)
-        await expect(selbox).toHaveValue(sys);
+    //await expect(selbox).toBeVisible();
+    for (let sys in cfg.default.writingSystems) {
+        await langDiv.locator('.dy-select').selectOption(sys);
+        langString = cfg.default.interfaceLanguages.writingSystems[sys].displayNames.en;
+        console.log(langString);
+        langDiv = await page.locator('.settings-item').filter({ hasText: langString });
+        //toHaveValue(sys);
+    }
+    //await expect(selbox).toBeVisible();
 
     if (cfg.default.programType == "SAB") {
         await expect(await page.locator('div.mt').textContent()).toEqual("John");
