@@ -124,6 +124,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="account-icon"
                         on:click={() => goto(getRoute('/account'))}
                     >
                         <AccountIcon color={iconColor} />{$t['Account_Page_Title']}
@@ -135,6 +136,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="contents-icon"
                         on:click={() => goto(getRoute('/contents/1'))}
                     >
                         <HomeIcon color={iconColor} />{$t['Menu_Contents']}
@@ -146,6 +148,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="search-icon"
                         on:click={() => goto(getRoute(`/search/${$refs.collection}`))}
                     >
                         <SearchIcon color={iconColor} />{$t['Menu_Search']}
@@ -158,6 +161,7 @@ The sidebar/drawer.
                     <button
                         style:color={textColor}
                         class="btn"
+                        data-testid="layouts-icon"
                         on:click={() => modal.open(MODAL_COLLECTION)}
                     >
                         <BibleIcon color={iconColor} />{$t['Menu_Layout']}
@@ -171,6 +175,7 @@ The sidebar/drawer.
                 <li>
                     <button
                         class="btn"
+                        data-testid="history-icon"
                         style:color={textColor}
                         on:click={() => goto(getRoute('/history'))}
                     >
@@ -183,6 +188,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="bookmarks-icon"
                         on:click={() => goto(getRoute('/bookmarks'))}
                     >
                         <BookmarkIcon color={iconColor} />{$t['Annotation_Bookmarks']}
@@ -194,6 +200,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="notes-icon"
                         on:click={() => goto(getRoute('/notes'))}
                     >
                         <NoteIcon color={iconColor} />{$t['Annotation_Notes']}
@@ -205,6 +212,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="highlights-icon"
                         on:click={() => goto(getRoute('/highlights'))}
                     >
                         <HighlightIcon color={iconColor} />{$t['Annotation_Highlights']}
@@ -219,6 +227,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="share-icon"
                         on:click={() => goto(getRoute('/share'))}
                     >
                         <ShareIcon color={iconColor} />{$t['Menu_Share_App']}
@@ -231,6 +240,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="plans-icon"
                         on:click={() => goto(getRoute('/plans'))}
                     >
                         <CalendarMonthIcon color={iconColor} />{$t['Menu_Plans']}
@@ -242,6 +252,7 @@ The sidebar/drawer.
                     <button
                         class="btn"
                         style:color={textColor}
+                        data-testid="settings-icon"
                         on:click={() => goto(getRoute('/settings'))}
                     >
                         <SettingsIcon color={iconColor} />{$t['Menu_Settings']}
@@ -292,6 +303,7 @@ The sidebar/drawer.
                 <button
                     class="btn"
                     style:color={textColor}
+                    data-testid="about-icon"
                     on:click={() => goto(getRoute('/about'))}
                 >
                     <AboutIcon color={iconColor} />{$t['Menu_About']}
