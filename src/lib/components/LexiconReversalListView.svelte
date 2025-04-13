@@ -1,6 +1,4 @@
 <script>
-    import { base } from '$app/paths';
-
     export let selectedLanguage;
     export let vernacularLanguage;
     export let vernacularWordsList;
@@ -8,46 +6,59 @@
     export let selectWord;
 </script>
 
-<ul class="space-y-2">
+<ul class="space-y-3">
     {#if selectedLanguage === vernacularLanguage}
         {#each vernacularWordsList as { id, name, homonym_index, type, num_senses, summary, letter }}
-            <li class="cursor-pointer text-lg" id="letter-{letter}">
-                <div on:click={() => selectWord({ word: name, index: id })}>
+            <li class="cursor-pointer text-lg mb-3" id="letter-{letter}">
+                <button
+                    type="button"
+                    class="w-full text-left py-1"
+                    aria-label={`Select word ${name}`}
+                    on:click={() => selectWord({ word: name, index: id })}
+                    on:keydown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            selectWord({ word: name, index: id });
+                            event.preventDefault();
+                        }
+                    }}
+                >
                     <p class="font-bold break-words">
                         {name}{#if homonym_index > 0}<sub>{homonym_index}</sub>{/if}
                     </p>
                     {#if summary}
                         <p class="ml-4 italic">
-                            {#each summary.match(/{(.*?)}/g) as match}
+                            {#each summary.match(/{(.*?)}/g) || [] as match}
                                 {match.replace(/[{}]/g, '')}
                             {/each}
                         </p>
                     {/if}
-                </div>
+                </button>
             </li>
         {/each}
     {:else}
-        {#each reversalWordsList as { word, indexes, letter }}
-            <li class="cursor-pointer text-lg mb-6" id="letter-{letter}">
-                <div on:click={() => selectWord({ word, indexes })}>
+        {#each reversalWordsList as { word, indexes, vernacularWords, letter }}
+            <li class="cursor-pointer text-lg mb-3" id="letter-{letter}">
+                <button
+                    type="button"
+                    class="w-full text-left py-1"
+                    aria-label={`Select word ${word}`}
+                    on:click={() => selectWord({ word, indexes })}
+                    on:keydown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            selectWord({ word, indexes });
+                            event.preventDefault();
+                        }
+                    }}
+                >
                     <p class="font-bold break-words">{word}</p>
                     <p class="text-md ml-4">
-                        {#each indexes as index, i}
+                        {#each vernacularWords as { name, homonymIndex }, i}
                             {#if i > 0},
                             {/if}
-                            {#await Promise.resolve(vernacularWordsList.find((vw) => vw.id === index)) then foundWord}
-                                {#if foundWord}
-                                    {foundWord.name}{#if foundWord.homonym_index > 0}<sub
-                                            >{foundWord.homonym_index}</sub
-                                        >{/if}
-                                {:else}
-                                    {console.log(`Index ${index} not found in vernacularWordsList`)}
-                                    {index}
-                                {/if}
-                            {/await}
+                            {name}{#if homonymIndex > 0}<sub>{homonymIndex}</sub>{/if}
                         {/each}
                     </p>
-                </div>
+                </button>
             </li>
         {/each}
     {/if}

@@ -16,28 +16,39 @@
     let singleEntryStyles = config.singleEntryStyles;
 
     async function queryXmlByWordId(wordId) {
-        const SQL = await initSqlJs({
-            locateFile: (file) => `${base}/wasm/sql-wasm.wasm`
-        });
+        try {
+            const SQL = await initSqlJs({
+                locateFile: (file) => `${base}/wasm/sql-wasm.wasm`
+            });
 
-        const response = await fetch(`${base}/data.sqlite`);
-        const buffer = await response.arrayBuffer();
-        const db = new SQL.Database(new Uint8Array(buffer));
-        if (!db) {
-            console.error('Database not initialized');
+            const response = await fetch(`${base}/data.sqlite`);
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to fetch database: ${response.status} ${response.statusText}`
+                );
+            }
+            const buffer = await response.arrayBuffer();
+            const db = new SQL.Database(new Uint8Array(buffer));
+            if (!db) {
+                console.error('Database not initialized');
+                return null;
+            }
+
+            const stmt = db.prepare('SELECT xml FROM entries WHERE id = ?');
+            stmt.bind([wordId]);
+
+            let result = null;
+            if (stmt.step()) {
+                result = stmt.getAsObject().xml;
+            }
+            stmt.free();
+            db.close();
+
+            return result;
+        } catch (error) {
+            console.error(`Error querying XML for word ID ${wordId}:`, error);
             return null;
         }
-
-        const stmt = db.prepare('SELECT xml FROM entries WHERE id = ?');
-        stmt.bind([wordId]);
-
-        let result = null;
-        if (stmt.step()) {
-            result = stmt.getAsObject().xml;
-        }
-        stmt.free();
-
-        return result;
     }
 
     function formatXmlByClass(xmlString) {
@@ -81,7 +92,7 @@
                             linkText = homonymIndex.toString();
                         }
 
-                        output += `<span class="clickable" data-word="${word}" data-index="${index}" data-homonym="${homonymIndex}">${linkText}</span>`;
+                        output += `<span class="clickable cursor-pointer" data-word="${word}" data-index="${index}" data-homonym="${homonymIndex}">${linkText}</span>`;
                         return output;
                     }
                 } else {
@@ -114,12 +125,6 @@
             return;
         }
 
-        for (let stl of singleEntryStyles) {
-            for (let elm of document.querySelectorAll(stl.name)) {
-                elm.style = convertStyle(stl.properties);
-            }
-        }
-
         let wordIds = selectedWord.indexes ? selectedWord.indexes : [selectedWord.index];
         let xmlResults = await Promise.all(wordIds.map(queryXmlByWordId));
 
@@ -135,6 +140,12 @@
         const spans = document.querySelectorAll('.clickable');
 
         spans.forEach((span) => {
+            const oldSpan = span.cloneNode(true);
+            span.parentNode.replaceChild(oldSpan, span);
+        });
+
+        const freshSpans = document.querySelectorAll('.clickable');
+        freshSpans.forEach((span) => {
             span.addEventListener('click', () => {
                 onSwitchLanguage(vernacularLanguage);
                 const word = span.getAttribute('data-word');
@@ -150,10 +161,19 @@
         });
     }
 
+    function applyStyles() {
+        for (let stl of singleEntryStyles) {
+            for (let elm of document.querySelectorAll(stl.name)) {
+                elm.style = convertStyle(stl.properties);
+            }
+        }
+    }
+
     onMount(updateXmlData);
 
     afterUpdate(() => {
         updateXmlData();
+        applyStyles();
         attachEventListeners();
     });
 </script>

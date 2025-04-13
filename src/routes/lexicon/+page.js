@@ -1,18 +1,14 @@
 import { base } from '$app/paths';
 import config from '$lib/data/config';
-import initSqlJs from 'sql.js';
-
-const SQL = await initSqlJs({
-    locateFile: (file) => `${base}/wasm/sql-wasm.wasm`
-});
+import { initializeDatabase, vernacularWordsStore } from '$lib/data/stores/lexicon';
 
 export async function load({ fetch }) {
     if (!config.writingSystems) {
         throw new Error('Writing systems configuration not found');
     }
 
-    const vernacularWritingSystem = Object.values(config.writingSystems).find(
-        (ws) => ws.type.includes('main')
+    const vernacularWritingSystem = Object.values(config.writingSystems).find((ws) =>
+        ws.type.includes('main')
     );
 
     if (!vernacularWritingSystem) {
@@ -21,7 +17,7 @@ export async function load({ fetch }) {
 
     const vernacularAlphabet = vernacularWritingSystem.alphabet;
     const vernacularLanguage = vernacularWritingSystem.displayNames.default;
-    
+
     const reversalWritingSystems = Object.entries(config.writingSystems).filter(
         ([key, ws]) => !ws.type.includes('main')
     );
@@ -31,29 +27,29 @@ export async function load({ fetch }) {
     }
 
     const reversalAlphabets = reversalWritingSystems.map(([key, ws]) => ({ [key]: ws.alphabet }));
-    const reversalLanguages = reversalWritingSystems.map(([key, ws]) => ({ [key]: ws.displayNames.default }));
-    
+    const reversalLanguages = reversalWritingSystems.map(([key, ws]) => ({
+        [key]: ws.displayNames.default
+    }));
+
     const dictionaryName = config.name;
 
-    const response = await fetch(`${base}/data.sqlite`);
-    const buffer = await response.arrayBuffer();
+    let db = await initializeDatabase({ fetch });
+    let results = db.exec(`SELECT id, name, homonym_index, type, num_senses, summary FROM entries`);
 
-    const db = new SQL.Database(new Uint8Array(buffer));
-    console.log('Database loaded:', db);
+    if (!results || results.length === 0) {
+        throw new Error('Vernacular query error');
+    }
 
-    const results = db.exec(
-        `SELECT id, name, homonym_index, type, num_senses, summary FROM entries`
-    );
     const result = results[0];
     console.log(result);
 
     let vernacularWordsList = [];
     if (results[0]) {
         vernacularWordsList = results[0].values.map((value) => {
-            const entry = {};
-            for (let i = 0; i < results[0].columns.length; ++i) {
-                entry[results[0].columns[i]] = value[i];
-            }
+            const entry = results[0].columns.reduce((acc, column, index) => {
+                acc[column] = value[index];
+                return acc;
+            }, {});
 
             let firstLetter = entry.name.charAt(0).toLowerCase();
 
@@ -80,11 +76,10 @@ export async function load({ fetch }) {
             entry.letter = firstLetter;
             return entry;
         });
-        sessionStorage.setItem('vernacularWordsList', JSON.stringify(vernacularWordsList));
+        vernacularWordsStore.set(vernacularWordsList);
     }
 
     return {
-        fetch,
         vernacularAlphabet,
         vernacularLanguage,
         reversalAlphabets,
