@@ -264,6 +264,7 @@ The sidebar/drawer.
                 <button
                     style:color={textColor}
                     class="btn"
+                    data-testid="text-appearance-icon"
                     on:click={() => modal.open(MODAL_TEXT_APPEARANCE)}
                 >
                     <TextAppearanceIcon color={iconColor} />{$t['Menu_Text_Appearance']}
