@@ -46,5 +46,10 @@
         {vernacularLanguage}
     />
 
-    <AlphabetStrip {alphabet} activeLetter={currentLetter} onLetterSelect={handleLetterSelect} />
+    <AlphabetStrip
+        data-testid="lexicon-alphabet-strip"
+        {alphabet}
+        activeLetter={currentLetter}
+        onLetterSelect={handleLetterSelect}
+    />
 </div>

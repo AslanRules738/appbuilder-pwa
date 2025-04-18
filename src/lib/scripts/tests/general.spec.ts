@@ -163,3 +163,62 @@ test('Test Settings', async ({ page }) => {
         }
     }
 });
+
+test('Test Tabs of Dictionary', async ({ page }) => {
+    const cfg = await import('$lib/data/config');
+    if (cfg.default.programType == "DAB") {
+        await page.goto('http://localhost:5173/');
+        // find writing system name
+        const vernName = await page.getByTestId("vernacular-language-tab").textContent();
+        const revName = await page.getByTestId("reversal-language-tab").textContent();
+
+        // switch for code in config
+        let vernCode = "wrong-v";
+        let revCode = "wrong-r";
+        for (let sys in cfg.default.writingSystems) {
+            let sysName = cfg.default.writingSystems[sys].displayNames["default"];
+            if (sysName.trim() === vernName.trim()) {
+                vernCode = sys;
+            }
+            if (sysName.trim() === revName.trim()) {
+                revCode = sys;
+            }
+        }
+        // switch for alphabet list in config
+        const vAlphabet = cfg.default.writingSystems[vernCode].alphabet;
+        const rAlphabet = cfg.default.writingSystems[revCode].alphabet;
+
+        // compare with alphabet list in buttons
+        await expect(await page.getByTestId('vernacular-language-tab')).toBeVisible();
+        await expect(await page.getByTestId('reversal-language-tab')).toBeVisible();
+
+        await page.getByTestId('vernacular-language-tab').click();
+        await expect(page.getByTestId('vernacular-language-indicator')).toHaveClass("existing");
+        const alphabet = await page.getByTestId('alphabet-strip');
+        const buttons = await alphabet.locator('button');
+        for (let i = 0; i < await buttons.count(); i++) {
+            const buttonText = await buttons.nth(i).textContent();
+            expect(vAlphabet[i]).toEqual(buttonText.trim());
+        }
+
+        const lv1 = await page.getByTestId('list-view');
+        const entries1 = await lv1.locator('li');
+        const c1 = await entries1.count();
+        expect(c1).toBeGreaterThan(1);
+
+        await page.getByTestId('reversal-language-tab').click();
+        await expect(page.getByTestId('reversal-language-indicator')).toHaveClass("existing");
+        const alphabet2 = await page.getByTestId('alphabet-strip');
+        const buttons2 = await alphabet2.locator('button');
+        for (let i = 0; i < await buttons2.count(); i++) {
+            const buttonText = await buttons2.nth(i).textContent();
+            expect(rAlphabet[i]).toEqual(buttonText.trim());
+        }
+
+        const lv2 = await page.getByTestId('list-view');
+        const entries2 = await lv2.locator('li');
+        const c2 = await entries2.count();
+        expect(c2).toBeGreaterThan(1);
+
+    }
+});

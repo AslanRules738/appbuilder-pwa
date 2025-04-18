@@ -6,8 +6,9 @@
     export let selectWord;
 </script>
 
-<ul class="space-y-3">
+<ul class="space-y-3" data-testid="list-view">
     {#if selectedLanguage === vernacularLanguage}
+        <div data-testid="vernacular-language-indicator" class="existing"></div>
         {#each vernacularWordsList as { id, name, homonym_index, type, num_senses, summary, letter }}
             <li class="cursor-pointer text-lg mb-3" id="letter-{letter}">
                 <button
@@ -36,6 +37,7 @@
             </li>
         {/each}
     {:else}
+        <div data-testid="reversal-language-indicator" class="existing"></div>
         {#each reversalWordsList as { word, indexes, vernacularWords, letter }}
             <li class="cursor-pointer text-lg mb-3" id="letter-{letter}">
                 <button
