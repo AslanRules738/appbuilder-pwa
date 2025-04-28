@@ -21,6 +21,7 @@
     } from '$lib/data/stores';
     import { AudioIcon, TextAppearanceIcon } from '$lib/icons';
     import { getRoute, navigateToText } from '$lib/navigate';
+    import { getDisplayString } from '$lib/scripts/scripture-reference-utils';
     import { compareVersions, pathJoin } from '$lib/scripts/stringUtils';
 
     const imageFolder =
@@ -138,7 +139,30 @@
             verse
         };
     }
-
+    let referenceTexts = new Map();
+    async function loadReferenceText(item) {
+        if (!referenceTexts.has(item)) {
+            referenceTexts.set(item, await getReferenceText(item));
+        }
+        return referenceTexts.get(item);
+    }
+    async function getReferenceText(item) {
+        const reference = await getReference(item);
+        let currentBookCollectionId = $refs.collection;
+        let collection = reference.collection ?? currentBookCollectionId;
+        const verse = reference.verse ? parseInt(reference.verse) : -1;
+        // Get the reference text.  Contents references may contain a collection,
+        // will contain a book and maybe a chapter and maybe a verse.  The getDisplayString
+        // method is setup to handle multiple verse ranges in a single reference even though
+        // that is not needed in this case.  Here, the verse is either the verse number of the
+        // reference or -1 if there is no verse number. The -1 indicates that it is a single
+        // verse, not a range, and the '-' is a verse range separator which is not used in this
+        // case.
+        const referenceText = getDisplayString(collection, reference.book, reference.chapter, [
+            [verse, -1, '-']
+        ]);
+        return referenceText;
+    }
     //set the title for the current contents page
     function setTitle(page) {
         //checks title type and returns the appropriate title or lack of title
@@ -272,7 +296,13 @@
                         <!--check for reference -->
                         {#if $page.data.features['show-references'] === true}
                             {#if item.linkType === 'reference'}
-                                <div class="contents-ref">{item.linkTarget}</div>
+                                {#await loadReferenceText(item)}
+                                    <div class="contents-ref"></div>
+                                {:then referenceText}
+                                    <div class="contents-ref">{referenceText}</div>
+                                {:catch error}
+                                    <div class="contents-ref"></div>
+                                {/await}
                             {/if}
                         {/if}
                     </div>

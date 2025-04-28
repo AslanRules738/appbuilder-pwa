@@ -289,6 +289,15 @@ function convertConfig(dataDir: string, verbose: number) {
     //const mainStyles = getTopAndMark(document,"styles");
     data.styles = parseStyles(mainStyles, verbose);
 
+    if (isDictionaryConfig(data)) {
+        const singleEntryStyles = document.querySelector('styles[type=single-entry]');
+        if (singleEntryStyles) {
+            data.singleEntryStyles = parseStyles(singleEntryStyles, verbose);
+        } else if (verbose) {
+            console.log('No single-entry styles found in the XML document');
+        }
+    }
+
     if (isScriptureConfig(data)) {
         data.traits = parseTraits(document, dataDir, verbose);
         data.bookCollections = parseBookCollections(document, verbose);
@@ -334,12 +343,8 @@ function convertConfig(dataDir: string, verbose: number) {
 
     data.translationMappings = parseMenuLocalizations(document, verbose);
 
-    if (isScriptureConfig(data)) {
-        data.keys = parseKeys(document, verbose);
-        /* about?: string; */
-        data.analytics = parseAnalytics(document, verbose);
-    }
-
+    data.keys = parseKeys(document, verbose);
+    data.analytics = parseAnalytics(document, verbose);
     data.firebase = parseFirebase(document, verbose);
 
     data.audio = { sources: {} };
@@ -376,12 +381,14 @@ function convertConfig(dataDir: string, verbose: number) {
         if (watermarkImages.length > 0) {
             data.watermarkImages = watermarkImages;
         }
+    }
 
-        const menuItems = parseMenuItems(document, 'drawer', verbose);
-        if (menuItems.length > 0) {
-            data.menuItems = menuItems;
-        }
+    const menuItems = parseMenuItems(document, 'drawer', verbose);
+    if (menuItems.length > 0) {
+        data.menuItems = menuItems;
+    }
 
+    if (isScriptureConfig(data)) {
         const bottomNavigationItems = parseMenuItems(document, 'bottom', verbose);
         if (bottomNavigationItems.length > 0) {
             data.bottomNavBarItems = bottomNavigationItems;
